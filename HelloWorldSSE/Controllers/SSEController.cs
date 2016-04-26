@@ -6,6 +6,7 @@ using System.IO;
 using System.Net.Http;
 using System.Web.Http;
 using System.Threading;
+using System.Collections.Concurrent;
 
 namespace HelloWorldSSE.Controllers
 {
@@ -15,7 +16,7 @@ namespace HelloWorldSSE.Controllers
     public class SSEController : ApiController
     {
         static Timer _timer = default(Timer);
-        private static readonly Queue<StreamWriter> _clients = new Queue<StreamWriter>();
+        static readonly ConcurrentQueue<StreamWriter> _clients = new ConcurrentQueue<StreamWriter>();
 
         // konstruktor
         public SSEController()
@@ -23,35 +24,48 @@ namespace HelloWorldSSE.Controllers
             _timer = _timer ?? new Timer(OnTimerEvent, null, 0, 1000);
         }
 
+       // [Route("/SSE")]
         public HttpResponseMessage Get()
         {
             HttpResponseMessage response = Request.CreateResponse();
             response.Content = new PushStreamContent((Action<Stream, HttpContent, TransportContext>)streamAvailableHandler, "text/event-stream");
+            
+            
+
+            
             return response;
         }
 
         private void streamAvailableHandler(Stream stream, HttpContent content, TransportContext context)
         {
-            StreamWriter clientStream = new StreamWriter(stream);
+            var clientStream = new StreamWriter(stream);
             _clients.Enqueue(clientStream);
+
         }
 
         static void OnTimerEvent(object state)
-        {   
-                if(_clients.Count != 0)
+        {
+            _timer.Change(Timeout.Infinite, Timeout.Infinite);
+            try
                 {
-                    string message = "david är en gnome";
+                    var message = "data:david är en gnome"+"\n\n";
                     foreach (StreamWriter cs in _clients)
                     {
                         try
                         {
                             // måste vara WriteLine och "data: "
-                            cs.WriteLine("data:" + message);
+                            cs.WriteLine(message);
                             cs.Flush();
                         }
-                        catch (Exception e) { throw e; }
+                        catch (Exception e) {
+
+                        }
                     }
-                }
+                } catch(Exception e) { }
+            finally
+            {
+                _timer.Change(1000, 1000);
+            }
         }
     }
 }
