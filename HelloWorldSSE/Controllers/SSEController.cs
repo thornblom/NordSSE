@@ -17,6 +17,8 @@ namespace HelloWorldSSE.Controllers
     {
         static Timer _timer = default(Timer);
         static readonly ConcurrentQueue<StreamWriter> _clients = new ConcurrentQueue<StreamWriter>();
+        static ConcurrentDictionary<int, StreamWriter> _clientsWithID = new ConcurrentDictionary<int, StreamWriter>();
+        static int _clientCount = 0;
 
         // konstruktor
         public SSEController()
@@ -25,9 +27,11 @@ namespace HelloWorldSSE.Controllers
         }
 
        // [Route("/SSE")]
-        public HttpResponseMessage Get()
+        public HttpResponseMessage Get([FromUri] string id)
         {
+            
             HttpResponseMessage response = Request.CreateResponse();
+            
             response.Content = new PushStreamContent((Action<Stream, HttpContent, TransportContext>)streamAvailableHandler, "text/event-stream");
             
             
@@ -39,7 +43,9 @@ namespace HelloWorldSSE.Controllers
         private void streamAvailableHandler(Stream stream, HttpContent content, TransportContext context)
         {
             var clientStream = new StreamWriter(stream);
-            _clients.Enqueue(clientStream);
+            //_clients.Enqueue(clientStream);
+            _clientsWithID.TryAdd(Interlocked.Increment(ref _clientCount), clientStream);
+            
 
         }
 
@@ -49,18 +55,24 @@ namespace HelloWorldSSE.Controllers
             try
                 {
                     var message = "data:david är en gnome"+"\n\n";
-                    foreach (StreamWriter cs in _clients)
+                    foreach (KeyValuePair<int, StreamWriter> cs in _clientsWithID)
                     {
+                    int id = cs.Key;
+                    StreamWriter s = cs.Value;
                         try
                         {
-                            // måste vara WriteLine och "data: "
-                            cs.WriteLine(message);
-                            cs.Flush();
+                        // måste vara WriteLine och "data: "
+                        //  cs.WriteLine(message);
+                        // cs.Flush();
+                        s.WriteLine("data:client number: " + id + "\n\n");
+                        s.Flush();
                         }
                         catch (Exception e) {
-
+                            _clientsWithID.TryRemove(id, out s);
                         }
                     }
+
+
                 } catch(Exception e) { }
             finally
             {
