@@ -17,8 +17,8 @@ namespace HelloWorldSSE.Controllers
     {
         static Timer _timer = default(Timer);
         static readonly ConcurrentQueue<StreamWriter> _clients = new ConcurrentQueue<StreamWriter>();
-        static ConcurrentDictionary<int, StreamWriter> _clientsWithID = new ConcurrentDictionary<int, StreamWriter>();
-        static int _clientCount = 0;
+        static ConcurrentDictionary<string, StreamWriter> _clientsWithID = new ConcurrentDictionary<string, StreamWriter>();
+        private string currentClient;
 
         // konstruktor
         public SSEController()
@@ -29,9 +29,8 @@ namespace HelloWorldSSE.Controllers
        // [Route("/SSE")]
         public HttpResponseMessage Get([FromUri] string id)
         {
-            
+            currentClient = id;
             HttpResponseMessage response = Request.CreateResponse();
-            
             response.Content = new PushStreamContent((Action<Stream, HttpContent, TransportContext>)streamAvailableHandler, "text/event-stream");
             
             
@@ -42,9 +41,10 @@ namespace HelloWorldSSE.Controllers
 
         private void streamAvailableHandler(Stream stream, HttpContent content, TransportContext context)
         {
+            
             var clientStream = new StreamWriter(stream);
             //_clients.Enqueue(clientStream);
-            _clientsWithID.TryAdd(Interlocked.Increment(ref _clientCount), clientStream);
+            _clientsWithID.TryAdd(currentClient, clientStream);
             
 
         }
@@ -55,9 +55,9 @@ namespace HelloWorldSSE.Controllers
             try
                 {
                     var message = "data:david är en gnome"+"\n\n";
-                    foreach (KeyValuePair<int, StreamWriter> cs in _clientsWithID)
+                    foreach (KeyValuePair<string, StreamWriter> cs in _clientsWithID)
                     {
-                    int id = cs.Key;
+                    string id = cs.Key;
                     StreamWriter s = cs.Value;
                         try
                         {
